@@ -42,7 +42,7 @@ class KTPExtractor():
     def extract(self) -> KTPIdentity:
         ktp_img = self.preprocess()
         result = image_to_string(ktp_img)
-        
+
         if not len(result):
             raise ValueError("No Data")
 
@@ -53,14 +53,10 @@ class KTPExtractor():
 
         for line in result.split("\n"):
             if "nik" in line.lower():
-                nik_match = re.search("\d+", line)
+                nik_match = re.search("\d{16}", line)
                 if nik_match:
                     nik = nik_match.group(0)
-                    identity.number = nik
-                try:
-                    nik = line.split(':')[1].strip()
-                except KeyError:
-                    nik = ""
+                    identity.number = self._clean_field(nik)
 
             elif 'nama' in line.lower():
                 name = re.sub("nama", "", line, flags=re.IGNORECASE)
