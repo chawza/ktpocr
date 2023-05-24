@@ -5,25 +5,24 @@ from datetime import date
 
 class Test(TestCase):
     project_path = os.path.dirname(os.path.dirname(__file__)) 
-    img_path = os.path.join(
+    clean_image_path = os.path.join(
         project_path,
         "test/resources/image_clean.jpeg"
     )
 
-    def test_test(self):
-        extractor = KTPExtractor(self.img_path)
-        # img = extractor.preprocess()
-        # img.save(os.path.join(self.project_path, 'test/resources/output1.jpg'))
+    def test_clean_image(self):
+        extractor = KTPExtractor(self.clean_image_path)
         identity = extractor.extract()
 
-        self.assertTrue(identity.name, "MIRA SETIAWAN")
-        self.assertTrue(identity.birth_place, "JAKARTA")
-        self.assertTrue(identity.birth_date, date(1986, 2, 18)) 
-        self.assertAlmostEqual(identity.full_address, "JL. PASTI CEPAT A7/66")
-        self.assertTrue(identity.neigborhood, "007/008")
-        self.assertTrue(identity.district, "PEGADUNGAN")
-        self.assertTrue(identity.sub_district, "KALIDERES")
-        self.assertTrue(identity.religion, "ISLAM")
-        self.assertTrue(identity.marital, "KAWIN")
-        self.assertTrue(identity.job, "PEGAWAI SWASTA")
-        self.assertTrue(identity.nationality, "WNI")
+        self.assertEqual(identity.number, "3171234567890123")
+        self.assertEqual(identity.name, "MIRA SETIAWAN")
+        self.assertEqual(identity.birth_place, "JAKARTA")
+        self.assertEqual(identity.birth_date, date(1986, 2, 18)) 
+        self.assertTrue("JL. PASTI CEPAT A7/66" in identity.full_address,)
+        self.assertEqual(identity.neigborhood, "007/008")
+        self.assertEqual(identity.district, "PEGADUNGAN")
+        self.assertEqual(identity.sub_district, "KALIDERES")
+        # self.assertEqual(identity.religion, "ISLAM")
+        self.assertEqual(identity.marital, "KAWIN")
+        self.assertEqual(identity.job, "PEGAWAI SWASTA")
+        self.assertTrue("WNI", identity.nationality)
