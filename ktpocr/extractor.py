@@ -46,12 +46,12 @@ class KTPExtractor():
         if not len(result):
             raise ValueError("No Data")
 
-        result = self._clean_result(result)
+        self.result = self._clean_result(result)
 
         # initate inital values
         identity = KTPIdentity(*[None for _ in range(14)])
 
-        for line in result.split("\n"):
+        for line in self.result.split("\n"):
             if "nik" in line.lower():
                 nik_match = re.search("\d{16}", line)
                 if nik_match:
@@ -67,12 +67,12 @@ class KTPExtractor():
                 try:
                     field = line.split(":")[1]
                     place = [char for char in field if char in ascii_letters]
-                    date_match= re.search("\d{2}-\d{2}-\d{4}", field)
+                    date_match = re.search("\d{2}-\d{2}-\d{4}", field)
                     if date_match:
                         match = date_match.group(0)
                         identity.birth_date = datetime.strptime(match, DATE_FORMAT).date()
                     identity.birth_place = ''.join(place)
-                except KeyError:
+                except IndexError:
                     pass
             
             elif 'alamat' in line.lower():
