@@ -1,9 +1,12 @@
-from unittest import TestCase
 import os
 from datetime import date
+
+from unittest import TestCase
 from difflib import SequenceMatcher
+
 from dataclasses import fields
-from typing import Optional
+from typing import Optional, Dict, Union
+
 from ktpocr import KTPExtractor, KTPIdentity
 
 
@@ -41,11 +44,7 @@ class Test(TestCase):
             else:
                 value = 0
 
-            report.update({
-                field: {
-                    "ratio": value, "value": getattr(target, field)
-                }
-            })
+            report.update({ field: value })
 
         for field in date_fields:
             if getattr(target, field):
@@ -53,15 +52,21 @@ class Test(TestCase):
             else:
                 value = False
 
-            report.update({
-                field: {
-                    "ratio": value, "value": getattr(target, field)
-                }
-            })
+            report.update({ field: value })
 
+        self.draw_table(report, truth, target)
+
+    def draw_table(self, report: Dict[str, Union[float, bool]], truth: KTPIdentity, target: KTPIdentity):
         print("="*50)
         for title, result in report.items():
-            print(f"{title:15}: {result['ratio']* 100:>6.2f}%  {result['value']}")
+            truth_value = getattr(truth, title)
+            target_value = getattr(target, title)
+
+            if isinstance(result, float):
+                print(f"{title:15}: {result * 100:>7.2f}% {truth_value:30}\t{target_value:30}")
+            else:
+                print(f"{title:15}: {result} {truth_value}\t{target_value}")
+
 
     def test_clean_image(self):
         ktp_truth = KTPIdentity(
