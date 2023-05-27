@@ -6,7 +6,7 @@ from unittest import TestCase
 from difflib import SequenceMatcher
 
 from dataclasses import fields
-from typing import Optional, Dict, Union
+from typing import Any, Optional, Dict, Union
 
 from ktpocr import KTPExtractor, KTPIdentity
 
@@ -60,10 +60,12 @@ class TestAccuracy(TestCase):
 
         if verbose:
             self.draw_table(report, truth, target)
-        self.print_accuracy(report)
+        accuracy = self.get_accuracy(report)
+        return accuracy
+        
 
     def draw_table(self, report: ReportType, truth: KTPIdentity, target: KTPIdentity):
-        print("="*50)
+        print('\n',"="*50)
 
         for title, result in report.items():
             truth_value = getattr(truth, title)
@@ -75,15 +77,18 @@ class TestAccuracy(TestCase):
             print(f"{title:15}: {result * 100:>7.2f}%\t{str(truth_value):30}\t{str(target_value):30}")
 
 
-    def print_accuracy(self, report: ReportType):
+    def get_accuracy(self, report: ReportType) -> float:
         total_score = 0.0
         for _, value in report.items():
             if isinstance(value, float):
                 total_score += value
             else:
                 total_score += (1.0 if value == True else 0.0)
-        avg = total_score/len(report.items()) * 100
-        print(f"{'AVG':15}: {avg:>7.2f}%")
+        avg = total_score/len(report.items())
+        if verbose:
+            print(f"{'AVG':15}: {avg * 100:>7.2f}%")
+
+        return avg
         
 
 
@@ -105,9 +110,11 @@ class TestAccuracy(TestCase):
             valid_date=date(2017, 2, 22)
         )
         img_path = self.get_test_image_path('image_clean.jpeg')
-        extractor = KTPExtractor(img_path, save_processed=True)
+        extractor = KTPExtractor(img_path)
         identity = extractor.extract()
-        self.validate_identity(ktp_truth, identity)
+        extractor.processed_img.save(self.get_test_image_path('processed_clean_ktp.jpeg'))
+        accuracy = self.validate_identity(ktp_truth, identity)
+        self.assertGreaterEqual(accuracy, .8)
 
     def test_ktp1(self):
         ktp_truth = KTPIdentity(
@@ -129,4 +136,29 @@ class TestAccuracy(TestCase):
         img_path = self.get_test_image_path('ktp1.jpeg')
         extractor = KTPExtractor(img_path, save_processed=True)
         identity = extractor.extract()
-        self.validate_identity(ktp_truth, identity)
+        accuracy = self.validate_identity(ktp_truth, identity)
+        self.assertGreaterEqual(accuracy, .8)
+
+    def test_ktp2(self):
+        ktp_truth = KTPIdentity(
+            number="3217061804870007",
+            name="ARIEF WIJAYA PUTRA",
+            birth_place="BANDUNG",
+            birth_date=date(1987, 4, 18),
+            sex="LAKI-LAKI",
+            full_address="JL. AMIR MAHMUD GG. SIRNAGALIH NO.62",
+            neigborhood="005/006",
+            district="CIBABAT",
+            sub_district="CIMAHI UTARA",
+            religion="ISLAM",
+            marital="BELUM KAWIN",
+            job="PELAJAR/MAHASISWA",
+            nationality="WNI",
+            valid_date="SEUMUR HIDUP"
+        )
+        img_path = self.get_test_image_path('ktp2.jpeg')
+        extractor = KTPExtractor(img_path, treshold=130)
+        identity = extractor.extract()
+        accuracy = self.validate_identity(ktp_truth, identity)
+        extractor.processed_img.save(self.get_test_image_path('processed_ktp2.jpeg'))
+        self.assertGreaterEqual(accuracy, .8)

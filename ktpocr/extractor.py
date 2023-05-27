@@ -79,7 +79,6 @@ def extract(text: str) -> KTPIdentity:
             identity.full_address = clean_field(address) 
 
         elif (rt_rw := search_rtrw(line)):
-            print('got', rt_rw)
             identity.neigborhood = rt_rw 
 
         elif (district_match := re.search('kel(.)*desa *:?', line, flags=re.IGNORECASE)):

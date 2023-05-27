@@ -1,5 +1,5 @@
-from typing import Optional
-from dataclasses import dataclass
+from typing import Optional, Union
+from dataclasses import dataclass, fields
 from datetime import date
 
 @dataclass
@@ -17,4 +17,16 @@ class KTPIdentity:
     marital: Optional[str]
     job: Optional[str]
     nationality: Optional[str]
-    valid_date: Optional[date] 
+    valid_date: Optional[Union[date, str]]
+
+    @property
+    def extracted_ration(self) -> float:
+        total = 0
+        count = 0
+
+        for field in fields(self):
+            if getattr(self, field.name) is not None:
+                total += 1
+            count += 1
+
+        return total/count
