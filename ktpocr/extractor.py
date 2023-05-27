@@ -7,7 +7,8 @@ from ktpocr import KTPIdentity
 
 DATE_FORMAT = "%d-%m-%Y"
 RELGIION_LIST = ["ISLAM", "KATOLIK", "PROTESTAN", "HINDU", "BUDHA", "KONGHUCU"]
-
+MARITAL_STATUSES = ['KAWIN', 'CERAI HIDUP', 'CERAI MATI', 'BELUM KAWIN']  # https://news.detik.com/berita/d-6457733/cara-dan-syarat-mengubah-status-ktp-menjadi-kawin
+SEX_CHOICES = ["LAKI-LAKI", "PEREMPUAN"]
 
 def match_patterns(input: str, patterns: List[str]):
     for pattern in patterns:
@@ -18,12 +19,20 @@ def match_patterns(input: str, patterns: List[str]):
 
 
 def search_nik(text: str) -> str | None:
-    cleaned = re.sub(' *', '', text)
+    cleaned = re.sub(' *', '', text)  # in case number are seperated by spaces
     search_nik = re.search("\d{16}", cleaned)
     if search_nik:
         return search_nik.group(0)
     else:
         return None
+    
+def search_rtrw(text: str) -> str | None:
+    search = re.search('\d{1,5} */ *\d{1,5}', text)
+    if search:
+        rtrw = search.group(0)
+        rtrw = re.sub(' *', '', rtrw ).strip()
+        return rtrw 
+    return None
     
 
 def extract(text: str) -> KTPIdentity:
@@ -36,18 +45,17 @@ def extract(text: str) -> KTPIdentity:
     text = clean_text(text)
 
     for line in text.split("\n"):
-
         if (found_nik := search_nik(line)):
             if found_nik:
                 identity.number = found_nik
 
         elif 'nama' in line.lower():
-            name = re.sub("nama *:?", "", line, flags=re.IGNORECASE)
+            name = re.sub("nama *:", "", line, flags=re.IGNORECASE)
             name = name.replace(':', "").strip()
             identity.name = name
 
         elif 'tempat' in line.lower():
-            dob = re.sub("tempat *:?", '', line, flags=re.IGNORECASE).strip()  # JAKARTA, 17-08-1945
+            dob = re.sub("tempat(.)*:", '', line, flags=re.IGNORECASE).strip()  # JAKARTA, 17-08-1945
 
             date_match = re.search("\d{2}-\d{2}-\d{4}", dob)  # 17-08-1945
             if date_match:
@@ -61,15 +69,20 @@ def extract(text: str) -> KTPIdentity:
             birth_place = birth_place.replace(',', '').strip()
             identity.birth_place = birth_place 
 
+        elif 'kelamin' in line.lower():
+            kelamin = match_patterns(line, SEX_CHOICES)
+            if kelamin:
+                identity.sex = kelamin
+
         elif 'alamat' in line.lower():
             address = re.sub('alamat', "", line, flags=re.IGNORECASE)
             identity.full_address = clean_field(address) 
 
-        elif (rtrw_match := re.search('rt(.)*rw', line, flags=re.IGNORECASE)):
-            neighborhood = line.replace(rtrw_match.group(0), '')
-            identity.neigborhood = clean_field(neighborhood) 
+        elif (rt_rw := search_rtrw(line)):
+            print('got', rt_rw)
+            identity.neigborhood = rt_rw 
 
-        elif (district_match := re.search('kel(.)*desa', line, flags=re.IGNORECASE)):
+        elif (district_match := re.search('kel(.)*desa *:?', line, flags=re.IGNORECASE)):
             district = line.replace(district_match.group(0), '')
             identity.district = clean_field(district)
 
@@ -83,8 +96,8 @@ def extract(text: str) -> KTPIdentity:
             identity.religion = match_patterns(religion, RELGIION_LIST)
 
         elif 'perkawinan' in line.lower():
-            marital = re.sub('(.)*perkawinan', "", line, flags=re.IGNORECASE)
-            identity.marital = clean_field(marital)
+            marital = re.sub('(.)*perkawinan( )*(:)?', "", line, flags=re.IGNORECASE)
+            identity.marital = match_patterns(marital, MARITAL_STATUSES) 
 
         elif 'pekerjaan' in line.lower():
             job = re.sub('pekerjaan', "", line, flags=re.IGNORECASE)
@@ -93,7 +106,7 @@ def extract(text: str) -> KTPIdentity:
 
         elif 'negaraan' in line.lower():
             nationality = re.sub('(.)*negaraan', "", line, flags=re.IGNORECASE)
-            identity.nationality = clean_field(nationality)
+            identity.nationality = 'WNI' if 'WNI' in nationality.upper() else clean_field(nationality)
 
     return identity
 
