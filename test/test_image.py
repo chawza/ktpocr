@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import date
 
 from unittest import TestCase
@@ -9,8 +10,11 @@ from typing import Optional, Dict, Union
 
 from ktpocr import KTPExtractor, KTPIdentity
 
+verbose = True if '-v' in sys.argv else False
 
-class Test(TestCase):
+ReportType = Dict[str, Union[float, bool]]
+
+class TestAccuracy(TestCase):
 
     def get_test_image_path(self, name: str) -> str:
         project_path = os.path.dirname(os.path.dirname(__file__))
@@ -54,18 +58,33 @@ class Test(TestCase):
 
             report.update({ field: value })
 
-        self.draw_table(report, truth, target)
+        if verbose:
+            self.draw_table(report, truth, target)
+        self.print_accuracy(report)
 
-    def draw_table(self, report: Dict[str, Union[float, bool]], truth: KTPIdentity, target: KTPIdentity):
+    def draw_table(self, report: ReportType, truth: KTPIdentity, target: KTPIdentity):
         print("="*50)
+
         for title, result in report.items():
             truth_value = getattr(truth, title)
             target_value = getattr(target, title)
 
-            if isinstance(result, float):
-                print(f"{title:15}: {result * 100:>7.2f}% {truth_value:30}\t{target_value:30}")
+            if isinstance(result, bool):
+                result = 1.0 if result == True else 0.0
+
+            print(f"{title:15}: {result * 100:>7.2f}%\t{str(truth_value):30}\t{str(target_value):30}")
+
+
+    def print_accuracy(self, report: ReportType):
+        total_score = 0.0
+        for _, value in report.items():
+            if isinstance(value, float):
+                total_score += value
             else:
-                print(f"{title:15}: {result} {truth_value}\t{target_value}")
+                total_score += (1.0 if value == True else 0.0)
+        avg = total_score/len(report.items()) * 100
+        print(f"{'AVG':15}: {avg:>7.2f}%")
+        
 
 
     def test_clean_image(self):
@@ -74,7 +93,7 @@ class Test(TestCase):
             name="MIRA SETIAWAN",
             birth_place="JAKARTA",
             birth_date=date(1986, 2, 18),
-            sex="LAKI-LAKI",
+            sex="PEREMPUAN",
             full_address="JL. PASTI CEPAT A7/66",
             neigborhood="007/008",
             district="PEGADUNGAN",
