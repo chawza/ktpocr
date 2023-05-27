@@ -1,10 +1,10 @@
 from unittest import TestCase
-from ktpocr.extractor import KTPExtractor, KTPIdentity
 import os
 from datetime import date
 from difflib import SequenceMatcher
 from dataclasses import fields
 from typing import Optional
+from ktpocr import KTPExtractor, KTPIdentity
 
 
 class Test(TestCase):

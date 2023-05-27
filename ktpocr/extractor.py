@@ -1,11 +1,9 @@
-from PIL import Image, ImageFilter
-from dataclasses import dataclass
-from datetime import date, datetime
-from pytesseract import image_to_string
 import re
-from typing import Optional, List
-from string import ascii_letters
-import os
+from typing import List
+
+from datetime import datetime
+
+from ktpocr import KTPIdentity
 
 DATE_FORMAT = "%d-%m-%Y"
 RELGIION_LIST = ["ISLAM", "KATOLIK", "PROTESTAN", "HINDU", "BUDHA", "KONGHUCU"]
@@ -26,135 +24,85 @@ def search_nik(text: str) -> str | None:
         return search_nik.group(0)
     else:
         return None
+    
 
+def extract(text: str) -> KTPIdentity:
+    """
+    @param text: A raw result of any OCR in a form of text 
+    """
+    # initate inital values
+    identity = KTPIdentity(*[None for _ in range(14)])
 
-@dataclass
-class KTPIdentity:
-    number: Optional[str]
-    name: Optional[str]
-    birth_place: Optional[str]
-    sex: Optional[str]
-    birth_date: Optional[date] 
-    full_address: Optional[str]
-    neigborhood: Optional[str]
-    district: Optional[str]
-    sub_district: Optional[str]
-    religion: Optional[str]
-    marital: Optional[str]
-    job: Optional[str]
-    nationality: Optional[str]
-    valid_date: Optional[date] 
+    text = clean_text(text)
 
+    for line in text.split("\n"):
 
-class KTPExtractor():
-    def __init__(self, image, save_processed=False) -> None:
-        self.img_path = image
-        self.raw_image = Image.open(image)
-        self.treshold = 150
-        self.save_processed = save_processed
+        if (found_nik := search_nik(line)):
+            if found_nik:
+                identity.number = found_nik
 
-    def preprocess(self):
-        img = self.raw_image.convert("L")
-        img = img.filter(ImageFilter.MedianFilter)
-        img = img.point(lambda x: 255 if x > self.treshold else 0)
+        elif 'nama' in line.lower():
+            name = re.sub("nama *:?", "", line, flags=re.IGNORECASE)
+            name = name.replace(':', "").strip()
+            identity.name = name
 
-        if self.save_processed:
-            file, ext = os.path.splitext(self.img_path)
-            img.save(file + 'test' + ext)
+        elif 'tempat' in line.lower():
+            dob = re.sub("tempat *:?", '', line, flags=re.IGNORECASE).strip()  # JAKARTA, 17-08-1945
 
-        return img
+            date_match = re.search("\d{2}-\d{2}-\d{4}", dob)  # 17-08-1945
+            if date_match:
+                match = date_match.group(0)
+                identity.birth_date = datetime.strptime(match, DATE_FORMAT).date()
 
-    def extract(self) -> KTPIdentity:
-        ktp_img = self.preprocess()
-        result = image_to_string(ktp_img)
+            if date_match:
+                birth_place = re.sub(match, '', dob, flags=re.IGNORECASE)  # Jakarta, 
+            else:
+                birth_place = dob
+            birth_place = birth_place.replace(',', '').strip()
+            identity.birth_place = birth_place 
 
-        if not len(result):
-            raise ValueError("No Data")
+        elif 'alamat' in line.lower():
+            address = re.sub('alamat', "", line, flags=re.IGNORECASE)
+            identity.full_address = clean_field(address) 
 
-        self.result = self._clean_result(result)
+        elif (rtrw_match := re.search('rt(.)*rw', line, flags=re.IGNORECASE)):
+            neighborhood = line.replace(rtrw_match.group(0), '')
+            identity.neigborhood = clean_field(neighborhood) 
 
-        # initate inital values
-        identity = KTPIdentity(*[None for _ in range(14)])
+        elif (district_match := re.search('kel(.)*desa', line, flags=re.IGNORECASE)):
+            district = line.replace(district_match.group(0), '')
+            identity.district = clean_field(district)
 
-        found_list = []
-        for line in self.result.split("\n"):
+        elif (sub_district_match := re.search('kecamatan', line, flags=re.IGNORECASE)):
+            sub_district = line.replace(sub_district_match.group(0), '')
+            identity.sub_district = clean_field(sub_district)
 
-            if 'nik' not in found_list:
-                found_nik = search_nik(line)
-                if found_nik:
-                    identity.number = found_nik
-                    found_list.append('nik')
-                    continue
+        elif 'agama' in line.lower():
+            religion = re.sub('agama', "", line, flags=re.IGNORECASE)
+            religion = clean_field(religion)
+            identity.religion = match_patterns(religion, RELGIION_LIST)
 
-            elif 'nama' in line.lower():
-                name = re.sub("nama *:?", "", line, flags=re.IGNORECASE)
-                name = name.replace(':', "").strip()
-                identity.name = name
-                continue
+        elif 'perkawinan' in line.lower():
+            marital = re.sub('(.)*perkawinan', "", line, flags=re.IGNORECASE)
+            identity.marital = clean_field(marital)
 
-            elif 'tempat' in line.lower():
-                try:
-                    field = line.split(":")[1]
-                    place = [char for char in field if char in ascii_letters]
-                    date_match = re.search("\d{2}-\d{2}-\d{4}", field)
-                    if date_match:
-                        match = date_match.group(0)
-                        identity.birth_date = datetime.strptime(match, DATE_FORMAT).date()
-                    identity.birth_place = ''.join(place)
-                    continue
-                except IndexError:
-                    pass
+        elif 'pekerjaan' in line.lower():
+            job = re.sub('pekerjaan', "", line, flags=re.IGNORECASE)
+            job = clean_field(job)
+            identity.job = job
 
-            elif 'alamat' in line.lower():
-                address = re.sub('alamat', "", line, flags=re.IGNORECASE)
-                identity.full_address = self._clean_field(address) 
-                continue
+        elif 'negaraan' in line.lower():
+            nationality = re.sub('(.)*negaraan', "", line, flags=re.IGNORECASE)
+            identity.nationality = clean_field(nationality)
 
-            elif (rtrw_match := re.search('rt(.)*rw', line, flags=re.IGNORECASE)):
-                neighborhood = line.replace(rtrw_match.group(0), '')
-                identity.neigborhood = self._clean_field(neighborhood) 
-                continue
+    return identity
 
-            elif (district_match := re.search('kel(.)*desa', line, flags=re.IGNORECASE)):
-                district = line.replace(district_match.group(0), '')
-                identity.district = self._clean_field(district)
-                continue
+def clean_text(text: str) -> str:
+    text = text.strip()
+    text = re.sub("(\n)+", "\n", text)
+    return text
 
-            elif (sub_district_match := re.search('kecamatan', line, flags=re.IGNORECASE)):
-                sub_district = line.replace(sub_district_match.group(0), '')
-                identity.sub_district = self._clean_field(sub_district)
-                continue
-
-            elif 'agama' in line.lower():
-                religion = re.sub('agama', "", line, flags=re.IGNORECASE)
-                religion = self._clean_field(religion)
-                identity.religion = match_patterns(religion, RELGIION_LIST)
-                continue
-
-            elif 'perkawinan' in line.lower():
-                marital = re.sub('(.)*perkawinan', "", line, flags=re.IGNORECASE)
-                identity.marital = self._clean_field(marital)
-                continue
-
-            elif 'pekerjaan' in line.lower():
-                job = re.sub('pekerjaan', "", line, flags=re.IGNORECASE)
-                job = self._clean_field(job)
-                identity.job = job
-                continue
-
-            elif 'negaraan' in line.lower():
-                nationality = re.sub('(.)*negaraan', "", line, flags=re.IGNORECASE)
-                identity.nationality = self._clean_field(nationality)
-                continue
-
-        return identity
-
-    def _clean_result(self, text: str) -> str:
-        text = text.strip()
-        text = re.sub("(\n)+", "\n", text)
-        return text
-
-    def _clean_field(self, text: str) -> str:
-        text = re.sub('-|:', '', text)
-        text = text.strip()
-        return text
+def clean_field(text: str) -> str:
+    text = re.sub('-|:', '', text)
+    text = text.strip()
+    return text
