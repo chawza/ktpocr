@@ -19,6 +19,9 @@ def match_patterns(input: str, patterns: List[str]):
 
 
 def search_nik(text: str) -> str | None:
+    """
+    known issue, can mistaken number '6' as letter 'b' 
+    """
     cleaned = re.sub(' *', '', text)  # in case number are seperated by spaces
     search_nik = re.search("\d{16}", cleaned)
     if search_nik:
@@ -52,7 +55,7 @@ def extract(text: str) -> KTPIdentity:
         elif 'nama' in line.lower():
             name = re.sub("nama *:", "", line, flags=re.IGNORECASE)
             name = name.replace(':', "").strip()
-            identity.name = name
+            identity.name = clean_field(name) 
 
         elif 'tempat' in line.lower():
             dob = re.sub("tempat(.)*:", '', line, flags=re.IGNORECASE).strip()  # JAKARTA, 17-08-1945
@@ -75,7 +78,7 @@ def extract(text: str) -> KTPIdentity:
                 identity.sex = kelamin
 
         elif 'alamat' in line.lower():
-            address = re.sub('alamat', "", line, flags=re.IGNORECASE)
+            address = re.sub('alamat *:?', "", line, flags=re.IGNORECASE)
             identity.full_address = clean_field(address) 
 
         elif (rt_rw := search_rtrw(line)):
@@ -115,6 +118,6 @@ def clean_text(text: str) -> str:
     return text
 
 def clean_field(text: str) -> str:
-    text = re.sub('-|:', '', text)
+    text = re.sub('-|:|=|—', '', text)
     text = text.strip()
     return text
