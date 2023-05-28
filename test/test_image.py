@@ -3,10 +3,9 @@ import sys
 from datetime import date
 
 from unittest import TestCase
-from difflib import SequenceMatcher
 
-from dataclasses import fields
-from typing import Any, Optional, Dict, Union
+from dataclasses import dataclass
+from typing import Dict, Union, List
 
 from ktpocr import KTPExtractor, KTPIdentity
 
@@ -14,56 +13,36 @@ verbose = True if '-v' in sys.argv else False
 
 ReportType = Dict[str, Union[float, bool]]
 
+@dataclass
+class TestResult:
+    filepath: str
+    accuracy: float
+    result: dict
+    identity: KTPIdentity
+
+    def print_result(self):
+        if verbose:
+            self.draw_table()
+        accuracy =f'{self.accuracy * 100:>17}%'
+        print(f'{os.path.basename(self.filepath):20}: {accuracy:5}')
+    
+    def draw_table(self):
+        print('\n',"="*50)
+
+        for title, result in self.result.items():
+            value = getattr(self.identity, title)
+            if isinstance(value, date):
+                value = str(value)
+            print(f"{title:15}: {result * 100:>7.2f}%\t{value}")
+
 class TestAccuracy(TestCase):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.test_results: List[TestResult] = []
 
     def get_test_image_path(self, name: str) -> str:
         project_path = os.path.dirname(os.path.dirname(__file__))
         return os.path.join(project_path, 'test', 'resources', name)
-
-    def validate_identity(self, truth: KTPIdentity, target: KTPIdentity):
-        char_fields = [field.name for field in fields(truth) if field.type == Optional[str]]
-        date_fields = [field.name for field in fields(truth) if field.type == Optional[date]]
-
-        report = {}
-
-        for field in char_fields:
-            if getattr(target, field):
-                value = SequenceMatcher(
-                    None,
-                    getattr(truth, field),
-                    getattr(target, field)
-                ).ratio()
-            else:
-                value = 0
-
-            report.update({ field: value })
-
-        for field in date_fields:
-            if getattr(target, field):
-                value = getattr(truth, field) == getattr(target, field)
-            else:
-                value = False
-
-            report.update({ field: value })
-
-        if verbose:
-            self.draw_table(report, truth, target)
-        accuracy = self.get_accuracy(report)
-        return accuracy
-        
-
-    def draw_table(self, report: ReportType, truth: KTPIdentity, target: KTPIdentity):
-        print('\n',"="*50)
-
-        for title, result in report.items():
-            truth_value = getattr(truth, title)
-            target_value = getattr(target, title)
-
-            if isinstance(result, bool):
-                result = 1.0 if result == True else 0.0
-
-            print(f"{title:15}: {result * 100:>7.2f}%\t{str(truth_value):30}\t{str(target_value):30}")
-
 
     def get_accuracy(self, report: ReportType) -> float:
         total_score = 0.0
@@ -73,11 +52,11 @@ class TestAccuracy(TestCase):
             else:
                 total_score += (1.0 if value == True else 0.0)
         avg = total_score/len(report.items())
-        if verbose:
-            print(f"{'AVG':15}: {avg * 100:>7.2f}%")
-
         return avg
-        
+
+    def doCleanups(self) -> None:
+        for result in self.test_results:
+            result.print_result()
 
 
     def test_clean_image(self):
@@ -101,9 +80,11 @@ class TestAccuracy(TestCase):
 
         extractor = KTPExtractor(img_path, treshold=150)
         identity = extractor.extract()
-        extractor._save_all_image()
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
 
-        accuracy = self.validate_identity(ktp_truth, identity)
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
         self.assertGreaterEqual(accuracy, .8)
 
     def test_ktp1(self):
@@ -124,9 +105,14 @@ class TestAccuracy(TestCase):
             valid_date=date(2017, 1, 24)
         )
         img_path = self.get_test_image_path('ktp1.jpeg')
-        extractor = KTPExtractor(img_path)
+
+        extractor = KTPExtractor(img_path, treshold=150)
         identity = extractor.extract()
-        accuracy = self.validate_identity(ktp_truth, identity)
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
+
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
         self.assertGreaterEqual(accuracy, .8)
 
     def test_ktp2(self):
@@ -150,7 +136,92 @@ class TestAccuracy(TestCase):
 
         extractor = KTPExtractor(img_path, treshold=150)
         identity = extractor.extract()
-        extractor._save_all_image()
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
 
-        accuracy = self.validate_identity(ktp_truth, identity)
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
+        self.assertGreaterEqual(accuracy, .8)
+
+    def test_ktp3(self):
+        ktp_truth = KTPIdentity(
+            number="3523160606800003",
+            name="MAFTUCHIN",
+            birth_place="TUBAN",
+            birth_date=date(1980, 6, 6),
+            sex="LAKI-LAKI",
+            full_address="JL. AMIR MAHMUD GG. SIRNAGALIH NO.62",
+            neigborhood="001/002",
+            district="SUGIHARJO",
+            sub_district="TUBAN",
+            religion="ISLAM",
+            marital="KAWIN",
+            job="WIRASWASTA",
+            nationality="WNI",
+            valid_date=date(2017, 6, 6)
+        )
+        img_path = self.get_test_image_path('ktp3.jpeg')
+
+        extractor = KTPExtractor(img_path, treshold=150)
+        identity = extractor.extract()
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
+
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
+        self.assertGreaterEqual(accuracy, .8)
+
+    def test_ktp5(self):
+        ktp_truth = KTPIdentity(
+            number="1204050503670001",
+            name="EDO FURNAMA",
+            birth_place="NIAS",
+            birth_date=date(1967, 3, 5),
+            sex="LAKI-LAKI",
+            full_address="DUSUN II HILIHAMBAWA",
+            neigborhood="001/003",
+            district="HILIGODU TANASOE",
+            sub_district="HILIDUHO",
+            religion="KATHOLIK",
+            marital="CERAI HIDUP",
+            job="WARTAWAN",
+            nationality="WNI",
+            valid_date=date(2018, 3, 5)
+        )
+        img_path = self.get_test_image_path('ktp5.jpeg')
+
+        extractor = KTPExtractor(img_path, treshold=150)
+        identity = extractor.extract()
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
+
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
+        self.assertGreaterEqual(accuracy, .8)
+    
+    def test_ktp6(self):
+        ktp_truth = KTPIdentity(
+            number="3216061812590006",
+            name="WIDIARSO",
+            birth_place="PEMALANG",
+            birth_date=date(1959, 12, 18),
+            sex="LAKI-LAKI",
+            full_address="SKU JL.SUMATRA BLOK B78/15",
+            neigborhood="003/004",
+            district="MEKARSARI",
+            sub_district="TAMBUN SELATAN",
+            religion="KATHOLIK",
+            marital="KAWIN",
+            job="KARYAWAN SWASTA",
+            nationality="WNI",
+            valid_date=date(2018, 12, 18)
+        )
+        img_path = self.get_test_image_path('ktp6.jpeg')
+
+        extractor = KTPExtractor(img_path, treshold=150)
+        identity = extractor.extract()
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
+
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
         self.assertGreaterEqual(accuracy, .8)

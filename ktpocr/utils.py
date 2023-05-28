@@ -1,6 +1,7 @@
 from typing import Optional, Union
 from dataclasses import dataclass, fields
 from datetime import date
+from difflib import SequenceMatcher
 
 @dataclass
 class KTPIdentity:
@@ -20,7 +21,7 @@ class KTPIdentity:
     valid_date: Optional[Union[date, str]]
 
     @property
-    def extracted_ration(self) -> float:
+    def extracted_ratio(self) -> float:
         total = 0
         count = 0
 
@@ -30,3 +31,31 @@ class KTPIdentity:
             count += 1
 
         return total/count
+    
+    def compare(self, truth: 'KTPIdentity') -> dict:
+        char_fields = [field.name for field in fields(truth) if field.type == Optional[str]]
+        date_fields = [field.name for field in fields(truth) if field.type == Optional[date]]
+
+        report = {}
+
+        for field in char_fields:
+            if getattr(self, field):
+                value = SequenceMatcher(
+                    None,
+                    getattr(truth, field),
+                    getattr(self, field)
+                ).ratio()
+            else:
+                value = 0
+
+            report.update({ field: value })
+
+        for field in date_fields:
+            if getattr(self, field):
+                value = getattr(truth, field) == getattr(self, field)
+            else:
+                value = False
+
+            report.update({ field: value })
+
+        return report
