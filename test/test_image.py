@@ -21,18 +21,6 @@ class TestAccuracy(TestCase):
         return os.path.join(project_path, 'test', 'resources', name)
 
     def validate_identity(self, truth: KTPIdentity, target: KTPIdentity):
-        # self.assertTrue(truth.number in target.number)
-        # self.assertTrue(truth.name in target.name)
-        # self.assertTrue(truth.birth_place in target.birth_place)
-        # self.assertEqual(truth.birth_date, target.birth_date)
-        # self.assertTrue(truth.full_address in target.full_address)
-        # self.assertTrue(truth.neigborhood in target.neigborhood)
-        # self.assertTrue(truth.district in target.district)
-        # self.assertTrue(truth.sub_district in target.sub_district)
-        # self.assertTrue(truth.religion in target.religion)
-        # self.assertTrue(truth.marital in target.marital)
-        # self.assertTrue(truth.job in target.job)
-        # self.assertTrue(truth.nationality in target.nationality)
         char_fields = [field.name for field in fields(truth) if field.type == Optional[str]]
         date_fields = [field.name for field in fields(truth) if field.type == Optional[date]]
 
@@ -110,9 +98,11 @@ class TestAccuracy(TestCase):
             valid_date=date(2017, 2, 22)
         )
         img_path = self.get_test_image_path('image_clean.jpeg')
-        extractor = KTPExtractor(img_path)
+
+        extractor = KTPExtractor(img_path, treshold=150)
         identity = extractor.extract()
-        extractor.processed_img.save(self.get_test_image_path('processed_clean_ktp.jpeg'))
+        extractor._save_all_image()
+
         accuracy = self.validate_identity(ktp_truth, identity)
         self.assertGreaterEqual(accuracy, .8)
 
@@ -134,7 +124,7 @@ class TestAccuracy(TestCase):
             valid_date=date(2017, 1, 24)
         )
         img_path = self.get_test_image_path('ktp1.jpeg')
-        extractor = KTPExtractor(img_path, save_processed=True)
+        extractor = KTPExtractor(img_path)
         identity = extractor.extract()
         accuracy = self.validate_identity(ktp_truth, identity)
         self.assertGreaterEqual(accuracy, .8)
@@ -157,8 +147,10 @@ class TestAccuracy(TestCase):
             valid_date="SEUMUR HIDUP"
         )
         img_path = self.get_test_image_path('ktp2.jpeg')
-        extractor = KTPExtractor(img_path, treshold=130)
+
+        extractor = KTPExtractor(img_path, treshold=150)
         identity = extractor.extract()
+        extractor._save_all_image()
+
         accuracy = self.validate_identity(ktp_truth, identity)
-        extractor.processed_img.save(self.get_test_image_path('processed_ktp2.jpeg'))
         self.assertGreaterEqual(accuracy, .8)
