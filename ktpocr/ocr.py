@@ -5,10 +5,11 @@ from PIL import ImageDraw
 def crop_text_area(img: Image) -> Image:
     result = image_to_boxes(img, output_type=Output.DICT)
 
-    left = min(result['left'])
-    top = min(result['top']) 
-    right = max(result['right']) 
-    bottom = max(result['bottom']) 
+    # First index is whole text
+    left = result['left'][0]
+    top = result['top'][0]
+    right = result['right'][0]
+    bottom = result['bottom'][0]
 
     # draw = ImageDraw.Draw(img)
     # shape = ((left,top), (right, bottom))
