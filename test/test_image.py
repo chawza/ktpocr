@@ -23,17 +23,23 @@ class TestResult:
     def print_result(self):
         if verbose:
             self.draw_table()
-        accuracy =f'{self.accuracy * 100:>17}%'
-        print(f'{os.path.basename(self.filepath):20}: {accuracy:5}')
+        accuracy =f'{self.accuracy * 100:.0f} %'
+        print(f'\n{os.path.basename(self.filepath):20}: {accuracy}', end='')
     
     def draw_table(self):
-        print('\n',"="*50)
+        buffer = ''
 
         for title, result in self.result.items():
             value = getattr(self.identity, title)
             if isinstance(value, date):
                 value = str(value)
-            print(f"{title:15}: {result * 100:>7.2f}%\t{value}")
+            row = f"{title:15}: {result * 100:>7.2f}%\t{value}"
+            buffer += row + '\n'
+
+        max_width = max([len(line) for line in buffer.split('\n')])
+
+        buffer = "=" * max_width + '\n' + buffer.strip()
+        print(buffer)
 
 class TestAccuracy(TestCase):
     def __init__(self, *args, **kwargs) -> None:
@@ -95,7 +101,7 @@ class TestAccuracy(TestCase):
             birth_date=date(1993, 1, 4),
             sex="LAKI-LAKI",
             full_address="JLUNIB PERMA III NO 35 PERUMNAS UNIB",
-            neigborhood="015 / 003",
+            neigborhood="015/003",
             district="PEMATANG GUBERNUR",
             sub_district="MUARA BANGKAHULU",
             religion="ISLAM",
@@ -222,6 +228,35 @@ class TestAccuracy(TestCase):
         
         result = identity.compare(ktp_truth)
         accuracy = self.get_accuracy(result)
+
+        self.test_results.append(TestResult(img_path, accuracy, result, identity))
+        self.assertGreaterEqual(accuracy, .8)
+    
+    def test_ktp7(self):
+        ktp_truth = KTPIdentity(
+            number="3471140209790001",
+            name="RIYANTO. SE",
+            birth_place="GROBOGAN",
+            birth_date=date(1976, 9, 2),
+            sex="LAKI-LAKI",
+            full_address="PRM PURI DOMAS D-3, SEMPU",
+            neigborhood="001/024",
+            district="WEDOMARTINI",
+            sub_district="NGEMPLAK",
+            religion="ISLAM",
+            marital="KAWIN",
+            job="PEDAGANG",
+            nationality="WNI",
+            valid_date=date(2017, 9, 2)
+        )
+        img_path = self.get_test_image_path('ktp7.jpeg')
+
+        extractor = KTPExtractor(img_path, treshold=150)
+        identity = extractor.extract()
+        
+        result = identity.compare(ktp_truth)
+        accuracy = self.get_accuracy(result)
+        extractor._save_all_image('ktp7_all.jpg')
 
         self.test_results.append(TestResult(img_path, accuracy, result, identity))
         self.assertGreaterEqual(accuracy, .8)

@@ -118,6 +118,6 @@ def clean_text(text: str) -> str:
     return text
 
 def clean_field(text: str) -> str:
-    text = re.sub('-|:|=|—', '', text)
+    text = re.sub('-|:|=|—|_|`|\|', '', text)
     text = text.strip()
     return text

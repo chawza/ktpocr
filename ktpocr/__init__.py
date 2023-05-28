@@ -3,8 +3,6 @@ from ktpocr.utils import KTPIdentity
 from ktpocr.extractor import extract as extract_identity 
 from ktpocr.ocr import ocr_tesseract, crop_text_area
 
-class FailDetectText(Exception):
-    pass
 
 class KTPExtractor():
     def __init__(self, image, treshold = 150) -> None:
@@ -15,16 +13,15 @@ class KTPExtractor():
     def extract(self) -> KTPIdentity:
         self.gray_img = self.raw_image.convert('L')
 
-        try:
-            self.cropped_img = crop_text_area(self.gray_img)
-        except ValueError:
-            self.cropped_img = self.gray_img
+        # try:
+        #     self.cropped_img = crop_text_area(self.gray_img)
+        # except ValueError:
+        #     self.cropped_img = self.gray_img
 
         # self.processed_img = self.preprocess(self.cropped_img, treshold=self.treshold)
-        self.ocr_result = ocr_tesseract(self.cropped_img)  # somehow unpreprocessed image is give btter result
+        # self.processed_img = self.cropped_img
 
-        if self.ocr_result.strip() == '':
-            raise FailDetectText()
+        self.ocr_result = ocr_tesseract(self.gray_img)  # somehow unpreprocessed image is give btter result
             
         identity = extract_identity(self.ocr_result)
         return identity
@@ -36,15 +33,15 @@ class KTPExtractor():
         return img
     
     def _save_all_image(self, path='./all_files.jpeg'):
-        gray, cropped = self.gray_img, self.cropped_img,
+        gray, cropped, processed = self.gray_img, self.cropped_img, self.processed_img
 
-        max_width = max(img.size[0] for img in [gray, cropped])
-        total_height = sum(img.size[1] for img in [gray, cropped])
+        max_width = max(img.size[0] for img in [gray, cropped, processed])
+        total_height = sum(img.size[1] for img in [gray, cropped, processed])
 
         canvas = Image.new('L', (max_width, total_height))
 
         offset = 0
-        for img in [gray, cropped]:
+        for img in [gray, cropped, processed]:
             box = (0, offset)
             canvas.paste(img, box)
             offset += img.size[1]
